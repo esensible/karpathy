@@ -35,7 +35,7 @@
     }
   },
   "expressions": {
-    "sum": {
+    "total": {
       "description": "Sum of A and B",
       "output_type": "float",
       "expression": {
@@ -48,7 +48,7 @@
       "output_type": "bool",
       "expression": {
         "expression_type": "EXPR",
-        "body": "sum > threshold"
+        "body": "total > threshold"
       }
     }
   }

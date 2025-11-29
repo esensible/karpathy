@@ -60,15 +60,15 @@ go get github.com/karpathy/dag-evaluator
     }
   },
   "expressions": {
-    "sum": {
+    "total": {
       "description": "Sum of A and B",
       "output_type": "float",
       "expression": {"expression_type": "EXPR", "body": "a + b"}
     },
     "result": {
-      "description": "Whether sum exceeds threshold",
+      "description": "Whether total exceeds threshold",
       "output_type": "bool",
-      "expression": {"expression_type": "EXPR", "body": "sum > threshold"}
+      "expression": {"expression_type": "EXPR", "body": "total > threshold"}
     }
   }
 }

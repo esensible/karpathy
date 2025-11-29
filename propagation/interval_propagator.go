@@ -64,12 +64,16 @@ func (p *IntervalPropagator) propagateExpressionInterval(node *dag.Node) error {
 		return nil
 	}
 
-	// Build interval environment
+	// Build interval environment from all nodes (including parameters)
 	intervals := make(map[string]distribution.Interval)
-	for _, depID := range node.Dependencies {
-		depNode, ok := p.dag.GetNode(depID)
-		if ok {
-			intervals[depID] = depNode.Interval
+	for id, n := range p.dag.Nodes {
+		if !n.Interval.IsEmpty() {
+			intervals[id] = n.Interval
+		} else if n.IsParameter() && n.IsResolved {
+			// Parameters should have point intervals from their value
+			if f, ok := n.Value.AsFloat(); ok {
+				intervals[id] = distribution.Point(f)
+			}
 		}
 	}
 
@@ -290,7 +294,9 @@ func (p *IntervalPropagator) isInDependencyChain(nodeID, targetID string, visite
 	return false
 }
 
-// ComputeSensitivity computes how sensitive the root interval is to each input.
+// ComputeSensitivity computes how sensitive the root is to each input.
+// For numeric roots, this is interval width reduction.
+// For boolean roots, this is based on dependency chain membership.
 func (p *IntervalPropagator) ComputeSensitivity() map[string]float64 {
 	sensitivity := make(map[string]float64)
 
@@ -298,6 +304,10 @@ func (p *IntervalPropagator) ComputeSensitivity() map[string]float64 {
 	if root == nil {
 		return sensitivity
 	}
+
+	// Check if root is Boolean (interval is [0, 1])
+	isBooleanRoot := root.Interval.Lower == 0 && root.Interval.Upper == 1 &&
+		root.Interval.Width() == 1
 
 	baseWidth := root.Interval.Width()
 	if math.IsInf(baseWidth, 0) || math.IsNaN(baseWidth) {
@@ -310,7 +320,26 @@ func (p *IntervalPropagator) ComputeSensitivity() map[string]float64 {
 			continue
 		}
 
-		// Temporarily resolve to midpoint and re-propagate
+		// For Boolean roots, use dependency-based sensitivity
+		if isBooleanRoot {
+			if p.CanAffectRoot(node.ID) {
+				// Assign sensitivity based on relative interval width of the input
+				inputWidth := node.Interval.Width()
+				if math.IsInf(inputWidth, 0) || math.IsNaN(inputWidth) {
+					inputWidth = 1e6
+				}
+				// Normalize to [0, 1] - wider inputs have more potential impact
+				sensitivity[node.ID] = math.Min(1.0, inputWidth/1e6)
+				if sensitivity[node.ID] < 0.1 {
+					sensitivity[node.ID] = 0.1 // Minimum sensitivity if in dependency chain
+				}
+			} else {
+				sensitivity[node.ID] = 0
+			}
+			continue
+		}
+
+		// For numeric roots, use interval width reduction
 		clonedDAG := p.dag.Clone()
 		inputNode, _ := clonedDAG.GetNode(node.ID)
 

@@ -38,7 +38,7 @@ func TestSimpleComparison(t *testing.T) {
 			}
 		},
 		"expressions": {
-			"sum": {
+			"total": {
 				"description": "Sum",
 				"output_type": "float",
 				"expression": {"expression_type": "EXPR", "body": "a + b"}
@@ -46,7 +46,7 @@ func TestSimpleComparison(t *testing.T) {
 			"result": {
 				"description": "Result",
 				"output_type": "bool",
-				"expression": {"expression_type": "EXPR", "body": "sum > threshold"}
+				"expression": {"expression_type": "EXPR", "body": "total > threshold"}
 			}
 		}
 	}`
@@ -150,7 +150,7 @@ func TestVoIRanking(t *testing.T) {
 			}
 		},
 		"expressions": {
-			"sum": {
+			"total": {
 				"description": "Sum",
 				"output_type": "float",
 				"expression": {"expression_type": "EXPR", "body": "cheap + expensive"}
@@ -158,7 +158,7 @@ func TestVoIRanking(t *testing.T) {
 			"result": {
 				"description": "Result",
 				"output_type": "bool",
-				"expression": {"expression_type": "EXPR", "body": "sum > 100"}
+				"expression": {"expression_type": "EXPR", "body": "total > 100"}
 			}
 		}
 	}`

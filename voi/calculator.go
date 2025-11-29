@@ -88,6 +88,7 @@ func (c *Calculator) ComputeAllScores() []InputScore {
 
 	// Compute sensitivity to pre-filter inputs
 	intervalProp := propagation.NewIntervalPropagator(c.dag)
+	intervalProp.PropagateIntervals() // Ensure intervals are populated
 	sensitivity := intervalProp.ComputeSensitivity()
 
 	for _, input := range unresolvedInputs {
