@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.2",
+  "name": "SimpleComparisonPolicy",
+  "description": "A simple policy to determine if A + B > 100",
+  "root_node_id": "result",
+  "enums": {},
+  "parameters": {
+    "threshold": {
+      "description": "The threshold to compare against",
+      "value": 100
+    }
+  },
+  "inputs": {
+    "a": {
+      "description": "First number",
+      "question": "Enter the first number:",
+      "label": "A",
+      "output_type": "float",
+      "acquisition_cost": 1.0,
+      "prior": {
+        "type": "uniform",
+        "params": {"min": 0, "max": 100}
+      }
+    },
+    "b": {
+      "description": "Second number",
+      "question": "Enter the second number:",
+      "label": "B",
+      "output_type": "float",
+      "acquisition_cost": 2.0,
+      "prior": {
+        "type": "uniform",
+        "params": {"min": 0, "max": 100}
+      }
+    }
+  },
+  "expressions": {
+    "sum": {
+      "description": "Sum of A and B",
+      "output_type": "float",
+      "expression": {
+        "expression_type": "EXPR",
+        "body": "a + b"
+      }
+    },
+    "result": {
+      "description": "Whether the sum exceeds the threshold",
+      "output_type": "bool",
+      "expression": {
+        "expression_type": "EXPR",
+        "body": "sum > threshold"
+      }
+    }
+  }
+}

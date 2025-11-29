@@ -1,0 +1,211 @@
+{
+  "schema_version": "1.2",
+  "name": "LoanApprovalPolicy",
+  "description": "Loan approval based on LVR and applicant profile",
+  "root_node_id": "loan_decision",
+  "enums": {
+    "LoanPurpose": ["OwnerOccupied", "Investment"],
+    "ApprovalStatus": ["Approved", "Declined", "ManualReview"],
+    "RiskLevel": ["Low", "Medium", "High"]
+  },
+  "parameters": {
+    "base_lvr_limit": {
+      "description": "Base LVR limit for owner-occupied loans",
+      "value": 90.0
+    },
+    "investment_lvr_limit": {
+      "description": "LVR limit for investment loans",
+      "value": 80.0
+    },
+    "min_credit_score": {
+      "description": "Minimum credit score for approval",
+      "value": 600
+    }
+  },
+  "inputs": {
+    "loan_amount": {
+      "description": "Total loan value you're requesting",
+      "question": "How much would you like to borrow?",
+      "label": "Loan Amount",
+      "output_type": "float",
+      "acquisition_cost": 1.0,
+      "prior": {
+        "type": "uniform",
+        "params": {"min": 100000, "max": 2000000}
+      }
+    },
+    "property_value": {
+      "description": "Market value of the property",
+      "question": "What is the property value?",
+      "label": "Property Value",
+      "output_type": "float",
+      "acquisition_cost": 5.0,
+      "prior": {
+        "type": "uniform",
+        "params": {"min": 200000, "max": 3000000}
+      }
+    },
+    "loan_purpose": {
+      "description": "What you'll use this loan for",
+      "question": "What is the purpose of this loan? (OwnerOccupied/Investment)",
+      "label": "Loan Purpose",
+      "output_type": "LoanPurpose",
+      "acquisition_cost": 0.5,
+      "prior": {
+        "type": "categorical",
+        "params": {
+          "values": ["OwnerOccupied", "Investment"],
+          "probs": [0.7, 0.3]
+        }
+      }
+    },
+    "credit_score": {
+      "description": "Your credit score (300-850)",
+      "question": "What is your credit score?",
+      "label": "Credit Score",
+      "output_type": "int",
+      "acquisition_cost": 10.0,
+      "prior": {
+        "type": "truncated_normal",
+        "params": {"mu": 700, "sigma": 100, "lower": 300, "upper": 850}
+      }
+    },
+    "annual_income": {
+      "description": "Your total annual income before tax",
+      "question": "What is your annual income?",
+      "label": "Annual Income",
+      "output_type": "float",
+      "acquisition_cost": 3.0,
+      "prior": {
+        "type": "truncated_normal",
+        "params": {"mu": 100000, "sigma": 50000, "lower": 30000, "upper": 500000}
+      }
+    },
+    "existing_debt": {
+      "description": "Your total existing debt obligations",
+      "question": "What is your total existing debt?",
+      "label": "Existing Debt",
+      "output_type": "float",
+      "acquisition_cost": 2.0,
+      "prior": {
+        "type": "uniform",
+        "params": {"min": 0, "max": 200000}
+      }
+    }
+  },
+  "expressions": {
+    "calculated_lvr": {
+      "description": "Loan-to-Value Ratio percentage",
+      "output_type": "float",
+      "expression": {
+        "expression_type": "EXPR",
+        "body": "property_value > 0 ? (loan_amount / property_value) * 100 : 100"
+      }
+    },
+    "max_allowable_lvr": {
+      "description": "Maximum LVR by loan purpose",
+      "output_type": "float",
+      "expression": {
+        "expression_type": "DECISION_TABLE",
+        "table": {
+          "hit_policy": "FIRST",
+          "rules": [
+            {"when": "loan_purpose == LoanPurpose.OwnerOccupied", "then": "base_lvr_limit"},
+            {"when": "loan_purpose == LoanPurpose.Investment", "then": "investment_lvr_limit"},
+            {"when": "true", "then": "investment_lvr_limit"}
+          ]
+        }
+      }
+    },
+    "debt_to_income_ratio": {
+      "description": "Total debt to income ratio",
+      "output_type": "float",
+      "expression": {
+        "expression_type": "EXPR",
+        "body": "annual_income > 0 ? ((loan_amount + existing_debt) / annual_income) * 100 : 999"
+      }
+    },
+    "lvr_check_passed": {
+      "description": "Whether LVR is within acceptable limits",
+      "output_type": "bool",
+      "expression": {
+        "expression_type": "EXPR",
+        "body": "calculated_lvr <= max_allowable_lvr"
+      }
+    },
+    "credit_check_passed": {
+      "description": "Whether credit score meets minimum requirements",
+      "output_type": "bool",
+      "expression": {
+        "expression_type": "EXPR",
+        "body": "credit_score >= min_credit_score"
+      }
+    },
+    "dti_check_passed": {
+      "description": "Whether debt-to-income ratio is acceptable",
+      "output_type": "bool",
+      "expression": {
+        "expression_type": "EXPR",
+        "body": "debt_to_income_ratio <= 600"
+      }
+    },
+    "risk_level": {
+      "description": "Overall risk assessment",
+      "output_type": "RiskLevel",
+      "expression": {
+        "expression_type": "DECISION_TABLE",
+        "table": {
+          "hit_policy": "FIRST",
+          "rules": [
+            {"when": "calculated_lvr <= 70 && credit_score >= 750", "then": "RiskLevel.Low"},
+            {"when": "calculated_lvr <= 80 && credit_score >= 650", "then": "RiskLevel.Low"},
+            {"when": "credit_score < 550 || calculated_lvr > max_allowable_lvr + 10", "then": "RiskLevel.High"},
+            {"when": "true", "then": "RiskLevel.Medium"}
+          ]
+        }
+      }
+    },
+    "loan_decision": {
+      "description": "Final approval decision",
+      "output_type": "ApprovalStatus",
+      "expression": {
+        "expression_type": "DECISION_TABLE",
+        "table": {
+          "hit_policy": "FIRST",
+          "rules": [
+            {
+              "description": "Decline if LVR exceeds limits",
+              "when": "!lvr_check_passed",
+              "then": "ApprovalStatus.Declined"
+            },
+            {
+              "description": "Decline if credit too low",
+              "when": "!credit_check_passed",
+              "then": "ApprovalStatus.Declined"
+            },
+            {
+              "description": "Decline if DTI too high",
+              "when": "!dti_check_passed",
+              "then": "ApprovalStatus.Declined"
+            },
+            {
+              "description": "Approve low risk applicants",
+              "when": "risk_level == RiskLevel.Low",
+              "then": "ApprovalStatus.Approved"
+            },
+            {
+              "description": "Manual review for medium risk",
+              "when": "risk_level == RiskLevel.Medium",
+              "then": "ApprovalStatus.ManualReview"
+            },
+            {
+              "description": "Decline high risk",
+              "when": "true",
+              "then": "ApprovalStatus.Declined"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
